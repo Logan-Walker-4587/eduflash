@@ -81,7 +81,7 @@ export default function Home() {
     setLoading(false);
   };
 
-  // Simplify only the answer part of the flashcard.
+  // Simplify only the answer part.
   const handleSimplify = async () => {
     if (!pdfFile || !apiKey || !flashcard) {
       alert("Flashcard not available or missing PDF/API key.");
@@ -92,8 +92,6 @@ export default function Home() {
 
     const formData = new FormData();
     formData.append("pdfFile", pdfFile);
-    // Build a prompt that instructs the API to simplify the answer only,
-    // while keeping the question unchanged.
     const simplifyPrompt = `Please simplify the answer portion of the following flashcard, keeping the question unchanged.
 **Question:** ${flashcard.front}
 **Answer:** ${flashcard.back}`;
@@ -107,14 +105,12 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok) {
-        // Parse the returned flashcard.
         const content = data.flashcard;
         const parsed = parseFlashcard(content);
-        // Optionally, if the question remains the same, update only the answer.
+        // If the question remains unchanged, update only the answer.
         if (parsed.front === "" || parsed.front === flashcard.front) {
           setFlashcard({ front: flashcard.front, back: parsed.back });
         } else {
-          // Otherwise, update the whole flashcard.
           setFlashcard(parsed);
         }
       } else {
@@ -130,7 +126,7 @@ export default function Home() {
     setAnswerVisible(true);
   };
 
-  // "Next" generates a new flashcard (normal mode).
+  // "Next" generates a new flashcard.
   const handleNext = async () => {
     await handleGenerate();
   };
@@ -144,11 +140,16 @@ export default function Home() {
     <div className="container">
       <header className="header">
         <h2>Flashcard Generator</h2>
-        <div className="user-menu">
-          <button className="user-icon">👤</button>
-          <div className="dropdown">
-            <div>Settings</div>
-            <div onClick={handleLogout}>Logout</div>
+        <div className="header-actions">
+          <button className="test-btn" onClick={() => router.push("/test")}>
+            Test
+          </button>
+          <div className="user-menu">
+            <button className="user-icon">👤</button>
+            <div className="dropdown">
+              <div>Settings</div>
+              <div onClick={handleLogout}>Logout</div>
+            </div>
           </div>
         </div>
       </header>
@@ -157,12 +158,7 @@ export default function Home() {
         <h3>Upload a PDF and Generate Flashcards</h3>
         <div className="form-group">
           <label>PDF File:</label>
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            ref={fileInputRef}
-          />
+          <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} />
         </div>
         <div className="form-group">
           <label>Groq API Key:</label>
@@ -228,6 +224,23 @@ export default function Home() {
           border-radius: 10px;
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
           margin-bottom: 30px;
+        }
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+        .test-btn {
+          padding: 8px 12px;
+          background: #ffc107;
+          color: #fff;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+          transition: background 0.3s;
+        }
+        .test-btn:hover {
+          background: #e0a800;
         }
         .user-menu {
           position: relative;
