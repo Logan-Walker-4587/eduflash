@@ -13,13 +13,13 @@ export default function Home() {
   const fileInputRef = useRef(null);
   const router = useRouter();
 
-  // If no user is logged in, redirect to login.
+  // Redirect if not logged in.
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (!user) {
       router.push("/login");
     }
-  }, []);
+  }, [router]);
 
   const handleFileChange = (e) => {
     setPdfFile(e.target.files[0]);
@@ -48,6 +48,7 @@ export default function Home() {
     return { front, back };
   };
 
+  // Standard flashcard generation.
   const handleGenerate = async () => {
     if (!pdfFile || !apiKey || !userInput) {
       alert("Please provide a PDF file, API key, and a question/topic.");
@@ -67,7 +68,6 @@ export default function Home() {
         body: formData,
       });
       const data = await res.json();
-
       if (res.ok) {
         const content = data.flashcard;
         const parsed = parseFlashcard(content);
@@ -81,10 +81,56 @@ export default function Home() {
     setLoading(false);
   };
 
+  // Simplify only the answer part of the flashcard.
+  const handleSimplify = async () => {
+    if (!pdfFile || !apiKey || !flashcard) {
+      alert("Flashcard not available or missing PDF/API key.");
+      return;
+    }
+    setLoading(true);
+    setAnswerVisible(false);
+
+    const formData = new FormData();
+    formData.append("pdfFile", pdfFile);
+    // Build a prompt that instructs the API to simplify the answer only,
+    // while keeping the question unchanged.
+    const simplifyPrompt = `Please simplify the answer portion of the following flashcard, keeping the question unchanged.
+**Question:** ${flashcard.front}
+**Answer:** ${flashcard.back}`;
+    formData.append("userInput", simplifyPrompt);
+    formData.append("apiKey", apiKey);
+
+    try {
+      const res = await fetch("/api/generate-flashcard", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Parse the returned flashcard.
+        const content = data.flashcard;
+        const parsed = parseFlashcard(content);
+        // Optionally, if the question remains the same, update only the answer.
+        if (parsed.front === "" || parsed.front === flashcard.front) {
+          setFlashcard({ front: flashcard.front, back: parsed.back });
+        } else {
+          // Otherwise, update the whole flashcard.
+          setFlashcard(parsed);
+        }
+      } else {
+        alert("Error: " + data.error);
+      }
+    } catch (error) {
+      alert("Request failed: " + error.message);
+    }
+    setLoading(false);
+  };
+
   const handleReveal = () => {
     setAnswerVisible(true);
   };
 
+  // "Next" generates a new flashcard (normal mode).
   const handleNext = async () => {
     await handleGenerate();
   };
@@ -109,12 +155,15 @@ export default function Home() {
 
       <main>
         <h3>Upload a PDF and Generate Flashcards</h3>
-
         <div className="form-group">
           <label>PDF File:</label>
-          <input type="file" accept="application/pdf" onChange={handleFileChange} ref={fileInputRef} />
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+          />
         </div>
-
         <div className="form-group">
           <label>Groq API Key:</label>
           <input
@@ -124,7 +173,6 @@ export default function Home() {
             placeholder="Enter your Groq API key"
           />
         </div>
-
         <div className="form-group">
           <label>Question or Topic:</label>
           <input
@@ -134,7 +182,6 @@ export default function Home() {
             placeholder="Enter a topic or question"
           />
         </div>
-
         <button className="generate-btn" onClick={handleGenerate} disabled={loading}>
           {loading ? "Generating..." : "Generate Flashcard"}
         </button>
@@ -149,12 +196,15 @@ export default function Home() {
             </div>
             <div className="button-group">
               {!answerVisible && flashcard.back && (
-                <button className="reveal-btn" onClick={handleReveal}>
+                <button className="action-btn reveal-btn" onClick={handleReveal}>
                   Reveal Answer
                 </button>
               )}
-              <button className="next-btn" onClick={handleNext}>
+              <button className="action-btn next-btn" onClick={handleNext}>
                 Next
+              </button>
+              <button className="action-btn simplify-btn" onClick={handleSimplify}>
+                Didn't Understand
               </button>
             </div>
           </div>
@@ -193,43 +243,41 @@ export default function Home() {
           transform: scale(1.1);
         }
         .dropdown {
-    display: none;
-    position: absolute;
-    right: 0;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-    z-index: 10;
-  }
-  .user-menu:hover .dropdown {
-    display: block;
-  }
-  .dropdown div {
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: background 0.2s;
-    /* Set the text color to a darker shade */
-    color: #333;
-  }
-  .dropdown div:hover {
-    background: #f0f0f0;
-  }
-  /* Optional: For dark mode environments, adjust the dropdown styles */
-  @media (prefers-color-scheme: dark) {
-    .dropdown {
-      background: #333;
-      border-color: #555;
-      box-shadow: 0 2px 5px rgba(255, 255, 255, 0.1);
-    }
-    .dropdown div {
-      color: #eee; /* lighter text on dark background */
-    }
-    .dropdown div:hover {
-      background: #444;
-    }
-  }
+          display: none;
+          position: absolute;
+          right: 0;
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 5px;
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+          overflow: hidden;
+          z-index: 10;
+        }
+        .user-menu:hover .dropdown {
+          display: block;
+        }
+        .dropdown div {
+          padding: 8px 12px;
+          cursor: pointer;
+          transition: background 0.2s;
+          color: #333;
+        }
+        .dropdown div:hover {
+          background: #f0f0f0;
+        }
+        @media (prefers-color-scheme: dark) {
+          .dropdown {
+            background: #333;
+            border-color: #555;
+            box-shadow: 0 2px 5px rgba(255, 255, 255, 0.1);
+          }
+          .dropdown div {
+            color: #eee;
+          }
+          .dropdown div:hover {
+            background: #444;
+          }
+        }
         main h3 {
           text-align: center;
           margin-bottom: 20px;
@@ -281,6 +329,7 @@ export default function Home() {
           box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
           margin-top: 30px;
           animation: fadeIn 0.5s ease-out;
+          overflow-wrap: break-word;
         }
         .flashcard .front {
           font-size: 1.3rem;
@@ -302,6 +351,7 @@ export default function Home() {
           display: flex;
           justify-content: center;
           gap: 20px;
+          margin-top: 20px;
         }
         .button-group button {
           padding: 10px 20px;
@@ -324,6 +374,13 @@ export default function Home() {
         }
         .next-btn:hover {
           background: #138496;
+        }
+        .simplify-btn {
+          background: #d63384;
+          color: #fff;
+        }
+        .simplify-btn:hover {
+          background: #c32b76;
         }
         @keyframes fadeIn {
           from {
@@ -348,5 +405,3 @@ export default function Home() {
     </div>
   );
 }
-
-
